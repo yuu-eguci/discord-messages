@@ -4,13 +4,18 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from formatters.anki import format_anki
 from formatters.fancyhtml import format_fancyhtml
 
 logger = logging.getLogger(__name__)
 
 
 def _default_output(format_name: str) -> str:
-    return f"main_003_parsedjsonl_to_anotherformat_{format_name}.jsonl"
+    if format_name == "fancyhtml":
+        return "main_003_parsedjsonl_to_anotherformat_fancyhtml.html"
+    if format_name == "anki":
+        return "main_003_parsedjsonl_to_anotherformat_anki.txt"
+    raise ValueError(f"Unknown format: {format_name}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -51,7 +56,7 @@ def _format_records(records: list[list[dict[str, Any]]], format_name: str) -> st
     if format_name == "fancyhtml":
         return format_fancyhtml(records)
     if format_name == "anki":
-        return "\n".join(json.dumps(record, ensure_ascii=False) for record in records) + "\n"
+        return format_anki(records)
     raise ValueError(f"Unknown format: {format_name}")
 
 
