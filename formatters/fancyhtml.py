@@ -29,6 +29,8 @@ def _render_entry(entry: dict[str, Any]) -> str:
 def format_fancyhtml(records: list[list[dict[str, Any]]]) -> str:
     blocks = []
     for record in records:
+        if not record:
+            continue
         entries = "\n".join(_render_entry(entry) for entry in record)
         blocks.append(f"    <section class=\"record\">\n{entries}\n    </section>")
 
@@ -98,4 +100,3 @@ def format_fancyhtml(records: list[list[dict[str, Any]]]) -> str:
         "</body>\n"
         "</html>\n"
     )
-
