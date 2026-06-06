@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def _default_output() -> str:
-    return f"({date.today():%Y-%m-%d})main_001_discord_to_jsonl.jsonl"
+    return "main_001_discord_to_jsonl.jsonl"
 
 
 def _parse_date_from(value: str | None) -> datetime | None:
