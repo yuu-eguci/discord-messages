@@ -1,6 +1,5 @@
 import argparse
 import json
-import sys
 from collections.abc import Iterable
 from datetime import date
 from itertools import islice
@@ -65,13 +64,16 @@ def _iter_records(input_path: Path, limit: int | None) -> list[dict[str, Any]]:
 def main() -> int:
     args = build_parser().parse_args()
     records = _iter_records(args.input, args.limit)
+    output_path = Path("output") / args.output
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    for record in records:
-        content = record.get("content", "")
-        if not isinstance(content, str):
-            content = str(content)
-        parsed = _parse_content(content, args.parser)
-        sys.stdout.write(json.dumps(parsed, ensure_ascii=False) + "\n")
+    with output_path.open("w", encoding="utf-8") as output_file:
+        for record in records:
+            content = record.get("content", "")
+            if not isinstance(content, str):
+                content = str(content)
+            parsed = _parse_content(content, args.parser)
+            output_file.write(json.dumps(parsed, ensure_ascii=False) + "\n")
 
     return 0
 
