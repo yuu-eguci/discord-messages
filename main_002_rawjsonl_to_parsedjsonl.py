@@ -58,7 +58,7 @@ def _iter_records(input_path: Path, limit: int | None) -> list[dict[str, Any]]:
             if line.strip()
         )
         if limit is not None:
-            records = islice(records, limit)
+            return list(islice(records, limit))
         return list(records)
 
 
