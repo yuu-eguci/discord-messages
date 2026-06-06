@@ -1,10 +1,13 @@
 import argparse
 import asyncio
 import json
+import logging
 from datetime import UTC, date, datetime, time
 from pathlib import Path
 
 import discord
+
+logger = logging.getLogger(__name__)
 
 
 def _default_output() -> str:
@@ -84,6 +87,8 @@ def build_intents() -> discord.Intents:
 async def _run() -> None:
     args = build_parser().parse_args()
     after = _parse_date_from(args.date_from)
+    output_path = Path("output") / args.output
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     client = discord.Client(intents=build_intents())
     async with client:
@@ -93,27 +98,32 @@ async def _run() -> None:
             raise TypeError("指定された channel はメッセージ履歴を取得できない。")
 
         # Message の中身: https://discordpy.readthedocs.io/en/v2.3.2/api.html#discord.Message
-        async for message in channel.history(
-            limit=args.limit,
-            after=after,
-            oldest_first=True,
-        ):
-            if args.discord_user_id is not None and message.author.id != args.discord_user_id:
-                continue
-            print(
-                json.dumps(
-                    {
-                        "message_id": message.id,
-                        "author_id": message.author.id,
-                        "created_at": message.created_at.isoformat(),
-                        "content": message.content,
-                    },
-                    ensure_ascii=False,
-                ),
-            )
+        with output_path.open("w", encoding="utf-8") as output_file:
+            async for message in channel.history(
+                limit=args.limit,
+                after=after,
+                oldest_first=True,
+            ):
+                if args.discord_user_id is not None and message.author.id != args.discord_user_id:
+                    continue
+                output_file.write(
+                    json.dumps(
+                        {
+                            "message_id": message.id,
+                            "author_id": message.author.id,
+                            "created_at": message.created_at.isoformat(),
+                            "content": message.content,
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n",
+                )
+
+    logger.info("出力ファイル: %s", output_path)
 
 
 def main() -> int:
+    logging.basicConfig(level=logging.INFO)
     asyncio.run(_run())
     return 0
 
