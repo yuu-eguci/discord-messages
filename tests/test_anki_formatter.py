@@ -30,7 +30,27 @@ class AnkiFormatterTests(unittest.TestCase):
             "#separator:tab\n#html:false\nfoo\tbar<br />baz\tdiscord\nqux\tquux\tdiscord\n",
         )
 
+    def test_skips_empty_records(self) -> None:
+        text = format_anki(
+            [
+                [],
+                [
+                    {
+                        "heading": "foo",
+                        "children": [
+                            "bar",
+                        ],
+                    },
+                ],
+                [],
+            ],
+        )
+
+        self.assertEqual(
+            text,
+            "#separator:tab\n#html:false\nfoo\tbar\tdiscord\n",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
-
