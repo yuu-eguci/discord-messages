@@ -140,3 +140,4 @@ cython_debug/
 my-images/*
 .DS_Store
 *.hdf5
+*.jsonl
