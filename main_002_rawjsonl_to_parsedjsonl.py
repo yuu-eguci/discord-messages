@@ -1,16 +1,18 @@
 import argparse
 import json
+import logging
 from collections.abc import Iterable
-from datetime import date
 from itertools import islice
 from pathlib import Path
 from typing import Any
 
 from parsers.default import parse_default_content
 
+logger = logging.getLogger(__name__)
+
 
 def _default_output() -> str:
-    return f"({date.today():%Y-%m-%d})main_002_rawjsonl_to_parsedjsonl.jsonl"
+    return "main_002_rawjsonl_to_parsedjsonl.jsonl"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -62,6 +64,7 @@ def _iter_records(input_path: Path, limit: int | None) -> list[dict[str, Any]]:
 
 
 def main() -> int:
+    logging.basicConfig(level=logging.INFO)
     args = build_parser().parse_args()
     records = _iter_records(args.input, args.limit)
     output_path = Path("output") / args.output
@@ -75,6 +78,7 @@ def main() -> int:
             parsed = _parse_content(content, args.parser)
             output_file.write(json.dumps(parsed, ensure_ascii=False) + "\n")
 
+    logger.info("出力ファイル: %s", output_path)
     return 0
 
 
