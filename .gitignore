@@ -142,3 +142,4 @@ my-images/*
 *.hdf5
 *.jsonl
 *.html
+*.txt
