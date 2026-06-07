@@ -27,7 +27,7 @@ class AnkiFormatterTests(unittest.TestCase):
 
         self.assertEqual(
             text,
-            "#separator:tab\n#html:false\nfoo\tbar<br />baz\tdiscord\nqux\tquux\tdiscord\n",
+            "#separator:tab\n#html:true\nfoo\tbar<br />baz\tdiscord\nqux\tquux\tdiscord\n",
         )
 
     def test_skips_empty_records(self) -> None:
@@ -48,7 +48,7 @@ class AnkiFormatterTests(unittest.TestCase):
 
         self.assertEqual(
             text,
-            "#separator:tab\n#html:false\nfoo\tbar\tdiscord\n",
+            "#separator:tab\n#html:true\nfoo\tbar\tdiscord\n",
         )
 
 
