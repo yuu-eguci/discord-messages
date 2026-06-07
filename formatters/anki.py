@@ -17,7 +17,7 @@ def _render_entry(entry: dict[str, Any]) -> str:
 
 
 def format_anki(records: list[list[dict[str, Any]]]) -> str:
-    lines = ["#separator:tab", "#html:false"]
+    lines = ["#separator:tab", "#html:true"]
     for record in records:
         if not record:
             continue
