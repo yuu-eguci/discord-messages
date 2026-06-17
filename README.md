@@ -1,6 +1,27 @@
 discord-messages
 ===
 
+今回のオモチャがやること
+
+- Discord のチャネルからメッセージを獲ってきて、整形して、別のフォーマット (html とか Anki txt) へコンバートする
+- まあ正直 html はオマケで、メインは Anki txt だよね
+
+今回のオモチャのウリ
+
+- Docker を使っているので、 Python バージョン気にする必要ナシ!
+- Docker ジョブ実行型で使うのにちょっと慣れてきた。普段は常駐サービスばっかりだもんね
+- 「メッセージ取得」「整形」「コンバート」を 001, 002, 003 という別スクリプトにしてるのは分かりやすい
+- 「整形」スクリプトに parser 引数用意してるのクールすぎ (まあ default しか用意してないけど)
+- 「コンバート」スクリプトに format 引数用意してるのもクールすぎ (いまのとこ fancyhtml, anki)
+
+![](./docs/readme-001.png)
+
+![](./docs/readme-002.png)
+
+![](./docs/readme-003.png)
+
+![](./docs/readme-004.png)
+
 ## dev note
 
 - Discord Application の作成が必要: https://discord.com/developers/applications
@@ -8,7 +29,7 @@ discord-messages
 - Discord 側で developer mode ON が必要: https://qiita.com/ymzkjpx/items/8f42733d0fb67d454e27
 
 ```bash
-docker compose up -d --build
+docker compose up --detached --build
 docker compose run --rm app pipenv install --dev
 docker compose run --rm app pipenv install --dev ruff
 docker compose run --rm app pipenv install discord.py
@@ -19,7 +40,9 @@ docker compose run --rm app pipenv install discord.py
 
 ```bash
 # 最初のセットアップ
-docker compose up -d --build
+# いつもは up -d --build してるけど、それはサーバとかウェブアプリのため (常駐サービス型)
+# 今回はそれぞれのスクリプトを単発で動かすだけで、最初のビルドは pipenv と dependencies を用意するのだけが目的 (ジョブ実行型) なので build だけでいいよ
+docker compose build
 
 # Ruff を動かしてみる
 docker compose run --rm app pipenv run ruff check .
