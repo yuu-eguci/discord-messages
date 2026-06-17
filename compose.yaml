@@ -22,6 +22,6 @@ services:
       #       この方式だと、たとえば、コンテナの中の venv も動くし、ホスト側で pipenv sync しても、コンテナ内とは
       #       同期されないから、別々の環境で main.py を動かすことだってできる。
       - /app/.venv
-    # コンテナを起動したままにする。
-    tty: true
-    stdin_open: true
+    # コンテナを起動したままにする……のは今回は (ジョブ実行型なので) 不要。
+    # tty: true
+    # stdin_open: true
