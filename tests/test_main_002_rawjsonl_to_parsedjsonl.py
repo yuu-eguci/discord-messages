@@ -34,7 +34,7 @@ class Main002ValidationTests(unittest.TestCase):
         self.assertIn("created_at=2026-06-17T09:00:00+09:00", captured.output[0])
 
     def test_warns_when_heading_has_no_children(self) -> None:
-        parsed = [
+        parsed: list[dict[str, object]] = [
             {
                 "heading": "foo",
                 "children": [],
@@ -55,7 +55,7 @@ class Main002ValidationTests(unittest.TestCase):
         self.assertIn("created_at=2026-06-17T09:00:00+09:00", captured.output[0])
 
     def test_does_not_warn_when_heading_has_children(self) -> None:
-        parsed = [
+        parsed: list[dict[str, object]] = [
             {
                 "heading": "foo",
                 "children": [
