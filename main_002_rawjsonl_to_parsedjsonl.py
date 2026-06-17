@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 from collections.abc import Iterable
+from datetime import UTC, datetime, timedelta, timezone
 from itertools import islice
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,7 @@ from typing import Any
 from parsers.default import parse_default_content
 
 logger = logging.getLogger(__name__)
+JST = timezone(timedelta(hours=9))
 
 
 def _default_output() -> str:
@@ -63,6 +65,52 @@ def _iter_records(input_path: Path, limit: int | None) -> list[dict[str, Any]]:
         return list(records)
 
 
+def _format_created_at_jst(value: object) -> str:
+    if not isinstance(value, str):
+        return ""
+
+    normalized = value.replace("Z", "+00:00")
+    parsed = datetime.fromisoformat(normalized)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(JST).isoformat()
+
+
+def _build_content_preview(content: object) -> str:
+    if not isinstance(content, str):
+        return "..."
+
+    normalized = " ".join(content.split())
+    return f"{normalized[:20]}..."
+
+
+def _warn_empty_parsed_record(content: object, created_at: object) -> None:
+    logger.warning(
+        "パースできなくて空っぽになってるメッセージがある: content_preview=%s created_at=%s",
+        _build_content_preview(content),
+        _format_created_at_jst(created_at),
+    )
+
+
+def _warn_entries_without_children(
+    parsed: list[dict[str, object]],
+    created_at: object,
+) -> None:
+    created_at_jst = _format_created_at_jst(created_at)
+
+    for entry in parsed:
+        heading = entry.get("heading")
+        children = entry.get("children")
+        if not isinstance(heading, str) or not heading:
+            continue
+        if isinstance(children, list) and not children:
+            logger.warning(
+                "heading はあるけど children のないメッセージがある: heading=%s created_at=%s",
+                heading,
+                created_at_jst,
+            )
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO)
     args = build_parser().parse_args()
@@ -76,6 +124,9 @@ def main() -> int:
             if not isinstance(content, str):
                 content = str(content)
             parsed = _parse_content(content, args.parser)
+            if not parsed:
+                _warn_empty_parsed_record(content, record.get("created_at"))
+            _warn_entries_without_children(parsed, record.get("created_at"))
             output_file.write(json.dumps(parsed, ensure_ascii=False) + "\n")
 
     logger.info("出力ファイル: %s", output_path)
