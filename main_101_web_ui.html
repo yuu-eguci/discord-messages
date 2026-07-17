@@ -48,6 +48,10 @@
     #log:empty {
       display: none;
     }
+    #finish-button {
+      margin-top: 1.5rem;
+      width: 100%;
+    }
   </style>
 </head>
 <body>
@@ -92,6 +96,8 @@
 
   <pre id="log"></pre>
 
+  <button id="finish-button" type="button" hidden>output フォルダに入ってるよ！じゃあ良い一日を！</button>
+
   <script>
     // フォームの初期値と選択肢を取得して埋めます。
     async function applyDefaults() {
@@ -120,6 +126,17 @@
     const form = document.getElementById("run-form");
     const runButton = form.querySelector("button[type=submit]");
     const logArea = document.getElementById("log");
+    const finishButton = document.getElementById("finish-button");
+
+    // 完了ボタン。押すとサーバーを止めて、お別れ画面に切り替えます。
+    finishButton.addEventListener("click", async () => {
+      // サーバーが返事の直後に終了するので、万一 fetch が失敗しても気にしません。
+      await fetch("/api/shutdown", { method: "POST" }).catch(() => {});
+      document.body.innerHTML = `
+        <h1>じゃあ良い一日を！👋</h1>
+        <p>サーバーは止めといたよ。このタブはもう閉じちゃって OK。</p>
+      `;
+    });
 
     function appendLog(text) {
       logArea.textContent += text + "\n";
@@ -145,9 +162,10 @@
       } else if (event.type === "step_end") {
         appendLog(`✓ ${event.script} が終わったよ`);
       } else if (event.type === "done") {
-        appendLog("🎉 全部終わったよ！ output フォルダを見てね！");
+        appendLog("🎉 全部終わったよ！");
         source.close();
         finishRun();
+        finishButton.hidden = false;
       } else if (event.type === "error") {
         appendLog(`💥 エラー: ${event.message}`);
         source.close();
@@ -167,6 +185,7 @@
 
       runButton.disabled = true;
       logArea.textContent = "";
+      finishButton.hidden = true;
 
       const response = await fetch("/api/run", {
         method: "POST",

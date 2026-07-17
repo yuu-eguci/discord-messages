@@ -287,10 +287,31 @@ async def events() -> StreamingResponse:
     return StreamingResponse(stream(), media_type="text/event-stream")
 
 
+@app.post("/api/shutdown")
+async def shutdown() -> dict[str, bool]:
+    """
+    POST /api/shutdown
+    サーバー自身を終了します。 run --rm で起動していれば、コンテナごと消えて終わりです。
+    """
+    if _server is None:
+        raise HTTPException(status_code=500, detail="サーバーの参照が無い。 main() 以外から起動された?")
+    # should_exit を立てると、 uvicorn はこのレスポンスを返し終えたあと、行儀よく終了してくれます。
+    _server.should_exit = True
+    return {"bye": True}
+
+
+# shutdown エンドポイントから uvicorn を止めるために、 Server インスタンスをグローバルに握っておきます。
+# NOTE: uvicorn.run(app) はお手軽だけど、 Server を内部で作って隠しちゃうので、外から止められません。
+_server: uvicorn.Server | None = None
+
+
 def main() -> int:
+    global _server
     logging.basicConfig(level=logging.INFO)
     # NOTE: 0.0.0.0 で待ち受けます。 127.0.0.1 だとコンテナの外 (ホストのブラウザ) から届きません。
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    config = uvicorn.Config(app, host="0.0.0.0", port=8000)
+    _server = uvicorn.Server(config)
+    _server.run()
     return 0
 
 
