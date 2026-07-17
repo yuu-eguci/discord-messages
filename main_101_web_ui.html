@@ -33,6 +33,21 @@
         button {
             padding: 0.5rem 1.5rem;
         }
+        #log {
+            margin-top: 1.5rem;
+            padding: 0.75rem;
+            border: 1px solid #8888;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            max-height: 20rem;
+            overflow-y: auto;
+        }
+        #log:empty {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -75,6 +90,8 @@
         </div>
     </form>
 
+    <pre id="log"></pre>
+
     <script>
         // フォームの初期値と選択肢を取得して埋めます。
         async function applyDefaults() {
@@ -100,9 +117,76 @@
         }
         applyDefaults();
 
-        document.getElementById("run-form").addEventListener("submit", (event) => {
+        const form = document.getElementById("run-form");
+        const runButton = form.querySelector("button[type=submit]");
+        const logArea = document.getElementById("log");
+
+        function appendLog(text) {
+            logArea.textContent += text + "\n";
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        function finishRun() {
+            runButton.disabled = false;
+        }
+
+        // dry run のときは UI テストが目的なので、必須チェックをスキップします。
+        const dryRunCheckbox = document.getElementById("dry-run");
+        dryRunCheckbox.addEventListener("change", () => {
+            form.noValidate = dryRunCheckbox.checked;
+        });
+
+        // SSE のイベントを 1 件受け取るたびに、ログへ 1 行足します。
+        function handleEvent(event, source) {
+            if (event.type === "step_start") {
+                appendLog(`▶ ${event.script} (${event.step}/3) を実行するよ`);
+            } else if (event.type === "log") {
+                appendLog(`    ${event.line}`);
+            } else if (event.type === "step_end") {
+                appendLog(`✓ ${event.script} が終わったよ`);
+            } else if (event.type === "done") {
+                appendLog("🎉 全部終わったよ！ output フォルダを見てね！");
+                source.close();
+                finishRun();
+            } else if (event.type === "error") {
+                appendLog(`💥 エラー: ${event.message}`);
+                source.close();
+                finishRun();
+            }
+        }
+
+        form.addEventListener("submit", async (event) => {
             event.preventDefault();
-            alert("実行はまだ作ってないよｗ");
+
+            // フォームの値を JSON に詰め替えます。空文字は「指定なし」なので null にします。
+            const payload = {};
+            for (const [key, value] of new FormData(form).entries()) {
+                payload[key] = value === "" ? null : value;
+            }
+            payload.dry_run = dryRunCheckbox.checked;
+
+            runButton.disabled = true;
+            logArea.textContent = "";
+
+            const response = await fetch("/api/run", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            if (!response.ok) {
+                const body = await response.json().catch(() => ({}));
+                appendLog(`💥 開始できなかった (${response.status}): ${JSON.stringify(body.detail ?? body)}`);
+                finishRun();
+                return;
+            }
+
+            const source = new EventSource("/api/events");
+            source.onmessage = (message) => handleEvent(JSON.parse(message.data), source);
+            source.onerror = () => {
+                appendLog("💥 接続が切れちゃった……");
+                source.close();
+                finishRun();
+            };
         });
     </script>
 </body>
