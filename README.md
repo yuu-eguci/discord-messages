@@ -48,6 +48,11 @@ docker compose build
 docker compose run --rm app pipenv run ruff check .
 docker compose run --rm app pipenv run ruff check --fix .
 
+# 自慢の web UI はこちら。
+(sleep 2 && open http://localhost:8000) & docker compose run --rm --service-ports web && open output
+# もしポートが埋まってたら↓
+# (sleep 2 && open http://localhost:8000) & docker compose run --rm -p 8080:8000 --service-ports web && open output
+
 # Python スクリプトを動かしてみる
 # NOTE: いやー、このスクリプトは秘密情報多いからここには書けないや。 help コマンドだけここに置いとくよ。
 docker compose run --rm app pipenv run python main_001_discord_to_jsonl.py --help
