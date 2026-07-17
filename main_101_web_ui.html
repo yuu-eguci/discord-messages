@@ -4,9 +4,106 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>discord-messages web UI</title>
+    <style>
+        :root {
+            /* ブラウザのライト/ダーク設定に合わせて、文字色やフォーム部品の色を自動で切り替えます。 */
+            color-scheme: light dark;
+        }
+        body {
+            font-family: sans-serif;
+            max-width: 640px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        form {
+            display: grid;
+            grid-template-columns: max-content 1fr;
+            gap: 0.75rem 1rem;
+            align-items: center;
+        }
+        label {
+            text-align: right;
+        }
+        input, select {
+            padding: 0.4rem;
+        }
+        .actions {
+            grid-column: 2;
+        }
+        button {
+            padding: 0.5rem 1.5rem;
+        }
+    </style>
 </head>
 <body>
     <h1>discord-messages web UI</h1>
-    <p>まだ空っぽだよ。これから作るよ。</p>
+    <form id="run-form">
+        <label for="discord-application-id">application id</label>
+        <input id="discord-application-id" name="discord_application_id" type="text" required>
+
+        <label for="discord-public-key">public key</label>
+        <input id="discord-public-key" name="discord_public_key" type="password" required>
+
+        <label for="discord-bot-token">bot token</label>
+        <input id="discord-bot-token" name="discord_bot_token" type="password" required>
+
+        <label for="discord-channel-id">channel id</label>
+        <input id="discord-channel-id" name="discord_channel_id" type="text" required>
+
+        <label for="discord-user-id">user</label>
+        <select id="discord-user-id" name="discord_user_id">
+            <option value="">(フィルタなし)</option>
+        </select>
+
+        <label for="date-from">date from</label>
+        <input id="date-from" name="date_from" type="date">
+
+        <label for="limit">limit</label>
+        <input id="limit" name="limit" type="number" min="1" placeholder="(無制限)">
+
+        <label for="format">format</label>
+        <select id="format" name="format">
+            <option value="anki" selected>anki</option>
+            <option value="fancyhtml">fancyhtml</option>
+        </select>
+
+        <label for="dry-run">dry run</label>
+        <input id="dry-run" name="dry_run" type="checkbox">
+
+        <div class="actions">
+            <button type="submit">実行</button>
+        </div>
+    </form>
+
+    <script>
+        // フォームの初期値と選択肢を取得して埋めます。
+        async function applyDefaults() {
+            const response = await fetch("/api/defaults");
+            const defaults = await response.json();
+
+            for (const key of [
+                "discord_application_id",
+                "discord_public_key",
+                "discord_bot_token",
+                "discord_channel_id",
+            ]) {
+                document.getElementById(key.replaceAll("_", "-")).value = defaults[key];
+            }
+
+            const userSelect = document.getElementById("discord-user-id");
+            for (const choice of defaults.discord_user_id_choices) {
+                const option = document.createElement("option");
+                option.value = choice.user_id;
+                option.textContent = choice.name;
+                userSelect.appendChild(option);
+            }
+        }
+        applyDefaults();
+
+        document.getElementById("run-form").addEventListener("submit", (event) => {
+            event.preventDefault();
+            alert("実行はまだ作ってないよｗ");
+        });
+    </script>
 </body>
 </html>
