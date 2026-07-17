@@ -25,3 +25,17 @@ services:
     # コンテナを起動したままにする……のは今回は (ジョブ実行型なので) 不要。
     # tty: true
     # stdin_open: true
+
+  # Web UI (main_101_web_ui.py) 用のサービスです。
+  # NOTE: run はデフォルトで ports を公開しないので、 --service-ports が必要。
+  #       docker compose run --rm --service-ports web
+  #       ホスト側の 8000 が埋まってたら docker compose run --rm -p 8080:8000 web とかで回避する。
+  web:
+    # 基本は app と同じ。
+    extends:
+      service: app
+    # ただ、起動した瞬間にこれ↓を実行する。
+    command: pipenv run python main_101_web_ui.py
+    # uvicorn が 8000 (右) で待っているので、そことホストの 8000 (左) をつなぐ。
+    ports:
+      - "8000:8000"

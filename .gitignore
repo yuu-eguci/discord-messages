@@ -143,3 +143,6 @@ my-images/*
 *.jsonl
 *.html
 *.txt
+
+# output の成果物を無視するための *.html の網から、 web UI のフロントだけ救出します。
+!main_101_web_ui.html
