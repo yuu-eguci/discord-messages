@@ -30,12 +30,58 @@ SCRIPT_003 = "main_003_parsedjsonl_to_anotherformat.py"
 OUTPUT_001 = "output/main_001_discord_to_jsonl.jsonl"
 OUTPUT_002 = "output/main_002_rawjsonl_to_parsedjsonl.jsonl"
 
+# NOTE: FastAPI の読み方は……
+#       @app.get とか @app.post がルーティング定義なので、そこを見ていく。
 app = FastAPI()
+
+
+@app.get("/")
+async def index() -> FileResponse:
+    """
+    まずは GET /
+    Web UI のページ (html 1 枚) を返します。
+    """
+    return FileResponse(INDEX_HTML_PATH)
+
+
+@app.get("/api/defaults")
+async def defaults() -> dict[str, object]:
+    """
+    次に GET /api/defaults
+    index.html を開いた直後に、フォームの初期値を取得するための API です。
+    ただの便利機能。
+    """
+    env = dotenv_values(ENV_PATH)
+    return {
+        "discord_application_id": env.get("WEB_DEFAULT_DISCORD_APPLICATION_ID") or "",
+        "discord_public_key": env.get("WEB_DEFAULT_DISCORD_PUBLIC_KEY") or "",
+        "discord_bot_token": env.get("WEB_DEFAULT_DISCORD_BOT_TOKEN") or "",
+        "discord_channel_id": env.get("WEB_DEFAULT_DISCORD_CHANNEL_ID") or "",
+        "discord_user_id_choices": _parse_user_id_choices(env.get("WEB_DISCORD_USER_ID_CHOICES_CSV") or ""),
+    }
+
+
+def _parse_user_id_choices(raw: str) -> list[dict[str, str]]:
+    """
+    "noctis:12345,seraphina:67890" 形式の文字列を、セレクトボックスの選択肢リストにパースします。
+    ":" が無い要素は ID のみとみなして、表示名にも ID をそのまま使います。
+    """
+    choices: list[dict[str, str]] = []
+    for item in raw.split(","):
+        stripped = item.strip()
+        if not stripped:
+            continue
+        name, _, user_id = stripped.partition(":")
+        if not user_id:
+            name = user_id = stripped
+        choices.append({"name": name, "user_id": user_id})
+    return choices
 
 
 class RunRequest(BaseModel):
     """
-    POST /api/run のリクエストボディです。各フィールドは 001〜003 のコマンドライン引数に対応します。
+    POST /api/run のリクエストボディです。
+    各フィールドは main scripts 001〜003 のコマンドライン引数に対応します。
     """
 
     discord_application_id: int | None = None
@@ -51,6 +97,10 @@ class RunRequest(BaseModel):
     @model_validator(mode="after")
     def _require_discord_args_unless_dry_run(self) -> "RunRequest":
         """
+        mode="before" 各フィールドに型を適用する前。 dict が渡ってくる。
+        mode="after" self の中に型付きの値が入ってくる。
+        そもそも型チェックでおかしかったらどーなんの? --> ここに来る前にすでに 422 で返る。
+
         本実行のときだけ、 Discord まわりの必須引数が揃っているか検証します。
         (dry run は UI のテスト用なので、空っぽでも通します。)
         """
@@ -68,6 +118,41 @@ class RunRequest(BaseModel):
         return self
 
 
+@app.post("/api/run")
+async def run(request: RunRequest) -> dict[str, bool]:
+    """
+    POST /api/run
+    ジョブ (script 001 → 002 → 003) を開始します。進捗は GET /api/events の SSE で流れます。
+    """
+    # 【この関数読む前に coroutine を知っとけ】
+    # coroutine は「誰かに駆動されるまでただの遅延オブジェクト」である。
+    # coroutine が駆動されるのは……
+    # - await されたとき (こいつはグローバルスコープに書けない)
+    # - asyncio.run されたとき (こいつがグローバルスコープに書けて、 async 処理を「始める者」!)
+    # - asyncio.create_task で「スケジュール」されて、さらに「イベントループ」で順番が来たとき
+
+    # dataclass Job です。 GET /api/events と POST /api/run で共有するので、グローバル変数に置いています。
+    global _current_job
+
+    # asyncio.Task の done() から、「もうタスク終わった?」ってのを聞いている。
+    # どうやってタスクのスタートをエンドが決まるの? って思うと思うけど、それは下を見て。
+    if _current_job is not None and not _current_job.task.done():
+        raise HTTPException(status_code=409, detail="ジョブが既に実行中だよ。")
+
+    # このキューはタスクを入れるものじゃなくて、 _run_job の中で dict を積むためのもの。
+    # GET /api/events のほうで dict を取り出して SSE で流すのに使います。
+    queue: asyncio.Queue = asyncio.Queue()
+
+    # 上でおさらいしたスケジュールされてイベントループで順番が来たとき (関数の return 後) 実行されるやつ。
+    task = asyncio.create_task(_run_job(request, queue))
+
+    _current_job = Job(queue=queue, task=task)
+
+    # 画面へ JSON を返す。
+    # JSONResponse を使ってもいいんだけど、 FastAPI はそこ自動なんだってさ。
+    return {"started": True}
+
+
 @dataclass
 class Job:
     """
@@ -79,48 +164,53 @@ class Job:
 
 
 # 一人用ツールなので、ジョブは同時に 1 個だけ、というシンプルな作りにしています。
+# NOTE: これはシングルトンではない。シングルトンは、何回インスタンスを new しても同じオブジェクトが返るやつね。
+#       このプログラムでは run ごとに新しい Job インスタンスを作らないといけないっしょ?
 _current_job: Job | None = None
 
 
-@app.get("/")
-async def index() -> FileResponse:
+async def _run_job(request: RunRequest, queue: asyncio.Queue) -> None:
     """
-    Web UI のページ (html 1 枚) を返します。
+    ジョブ全体を実行して、最後に done か error のイベントを積みます。
     """
-    return FileResponse(INDEX_HTML_PATH)
+    try:
+        if request.dry_run:
+            await _run_dry(queue)
+        else:
+            await _run_real(request, queue)
+    except Exception as exception:
+        logger.exception("ジョブが失敗した。")
+        await queue.put({"type": "error", "message": str(exception)})
+    else:
+        await queue.put({"type": "done"})
 
 
-def _parse_user_id_choices(raw: str) -> list[dict[str, str]]:
+async def _run_dry(queue: asyncio.Queue) -> None:
     """
-    "yuu:12345,taro:67890" 形式の文字列を、セレクトボックスの選択肢リストにパースします。
-    ":" が無い要素は ID のみとみなして、表示名にも ID をそのまま使います。
+    UI テスト用のドライランです。 subprocess の代わりに sleep しながら、本物と同じ形のイベントを流します。
     """
-    choices: list[dict[str, str]] = []
-    for item in raw.split(","):
-        stripped = item.strip()
-        if not stripped:
-            continue
-        name, _, user_id = stripped.partition(":")
-        if not user_id:
-            name = user_id = stripped
-        choices.append({"name": name, "user_id": user_id})
-    return choices
+    fake_logs = [
+        (
+            SCRIPT_001,
+            ["Discord にログインしたつもり。", "メッセージを 42 件取得したつもり。", f"出力ファイル: {OUTPUT_001}"],
+        ),
+        (SCRIPT_002, ["42 件パースしたつもり。", f"出力ファイル: {OUTPUT_002}"]),
+        (SCRIPT_003, ["フォーマットしたつもり。", "出力ファイル: output/(dry run なので何も書いてないよ)"]),
+    ]
+    for step, (script, lines) in enumerate(fake_logs, start=1):
+        await queue.put({"type": "step_start", "step": step, "script": script})
+        for line in lines:
+            await asyncio.sleep(0.6)
+            await queue.put({"type": "log", "step": step, "line": f"[dry run] {line}"})
+        await queue.put({"type": "step_end", "step": step, "script": script})
 
 
-@app.get("/api/defaults")
-async def defaults() -> dict[str, object]:
+async def _run_real(request: RunRequest, queue: asyncio.Queue) -> None:
     """
-    フォームの初期値と選択肢を .env から読んで返します。 .env が無ければ全部空です。
-    NOTE: この .env は web UI 専用です。 001〜003 のスクリプトは読みません (秘密情報は引数で渡す思想)。
+    script 001 → 002 → 003 を順番に subprocess で実行します。
     """
-    env = dotenv_values(ENV_PATH)
-    return {
-        "discord_application_id": env.get("WEB_DEFAULT_DISCORD_APPLICATION_ID") or "",
-        "discord_public_key": env.get("WEB_DEFAULT_DISCORD_PUBLIC_KEY") or "",
-        "discord_bot_token": env.get("WEB_DEFAULT_DISCORD_BOT_TOKEN") or "",
-        "discord_channel_id": env.get("WEB_DEFAULT_DISCORD_CHANNEL_ID") or "",
-        "discord_user_id_choices": _parse_user_id_choices(env.get("WEB_DISCORD_USER_ID_CHOICES_CSV") or ""),
-    }
+    for step, (script, command) in enumerate(_build_commands(request), start=1):
+        await _run_script(queue, step, script, command)
 
 
 def _build_commands(request: RunRequest) -> list[tuple[str, list[str]]]:
@@ -172,75 +262,22 @@ async def _run_script(queue: asyncio.Queue, step: int, script: str, command: lis
     await queue.put({"type": "step_end", "step": step, "script": script})
 
 
-async def _run_real(request: RunRequest, queue: asyncio.Queue) -> None:
-    """
-    001 → 002 → 003 を順番に subprocess で実行します。
-    """
-    for step, (script, command) in enumerate(_build_commands(request), start=1):
-        await _run_script(queue, step, script, command)
-
-
-async def _run_dry(queue: asyncio.Queue) -> None:
-    """
-    UI テスト用のドライランです。 subprocess の代わりに sleep しながら、本物と同じ形のイベントを流します。
-    """
-    fake_logs = [
-        (
-            SCRIPT_001,
-            ["Discord にログインしたつもり。", "メッセージを 42 件取得したつもり。", f"出力ファイル: {OUTPUT_001}"],
-        ),
-        (SCRIPT_002, ["42 件パースしたつもり。", f"出力ファイル: {OUTPUT_002}"]),
-        (SCRIPT_003, ["フォーマットしたつもり。", "出力ファイル: output/(dry run なので何も書いてないよ)"]),
-    ]
-    for step, (script, lines) in enumerate(fake_logs, start=1):
-        await queue.put({"type": "step_start", "step": step, "script": script})
-        for line in lines:
-            await asyncio.sleep(0.6)
-            await queue.put({"type": "log", "step": step, "line": f"[dry run] {line}"})
-        await queue.put({"type": "step_end", "step": step, "script": script})
-
-
-async def _run_job(request: RunRequest, queue: asyncio.Queue) -> None:
-    """
-    ジョブ全体を実行して、最後に done か error のイベントを積みます。
-    """
-    try:
-        if request.dry_run:
-            await _run_dry(queue)
-        else:
-            await _run_real(request, queue)
-    except Exception as exception:
-        logger.exception("ジョブが失敗した。")
-        await queue.put({"type": "error", "message": str(exception)})
-    else:
-        await queue.put({"type": "done"})
-
-
-@app.post("/api/run")
-async def run(request: RunRequest) -> dict[str, bool]:
-    """
-    ジョブ (001 → 002 → 003) を開始します。進捗は GET /api/events の SSE で流れます。
-    """
-    global _current_job
-    if _current_job is not None and not _current_job.task.done():
-        raise HTTPException(status_code=409, detail="ジョブが既に実行中だよ。")
-    queue: asyncio.Queue = asyncio.Queue()
-    task = asyncio.create_task(_run_job(request, queue))
-    _current_job = Job(queue=queue, task=task)
-    return {"started": True}
-
-
 @app.get("/api/events")
 async def events() -> StreamingResponse:
     """
+    GET /api/events
     実行中のジョブの進捗イベントを SSE で流します。 done か error を流したら接続を閉じます。
     """
     if _current_job is None:
         raise HTTPException(status_code=404, detail="ジョブがまだ開始されてないよ。")
+
+    # グローバル変数のほうは POST /api/run の中でいつ変わるとも分からない。
+    # なのでこの時点での Job インスタンスの参照を握っておきます。
     job = _current_job
 
     async def stream() -> AsyncIterator[str]:
         while True:
+            # queue に次のモノが put されるまで止まってるやつ。
             event = await job.queue.get()
             # SSE の形式は「data: (中身)」+ 空行。これだけで動く素朴なプロトコルです。
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
