@@ -5,6 +5,9 @@ name = "pypi"
 
 [packages]
 "discord.py" = "*"
+fastapi = "*"
+uvicorn = "*"
+python-dotenv = "*"
 
 [dev-packages]
 ruff = "*"
