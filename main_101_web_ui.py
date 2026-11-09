@@ -3,10 +3,11 @@ import json
 import logging
 import os
 import sys
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Self
+from urllib.parse import urlsplit
 
 import uvicorn
 
@@ -14,9 +15,9 @@ import uvicorn
 #       ただし pipenv が .env を読むタイミングはプロセスを起動したとき。
 #       dotenv であれば、リアルタイムで .env を変更できる良さがあるので、今回は採用。
 from dotenv import dotenv_values
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, model_validator
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,18 @@ app = FastAPI()
 # GET /api/defaults は bot token を返すので、 Host が localhost / 127.0.0.1 以外のリクエストは 400 で拒否します。
 # (悪意のあるサイトが DNS rebinding で、ブラウザ経由でこの API を読むのを防ぐため。)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1"])
+
+
+@app.middleware("http")
+async def reject_cross_origin_post(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    """
+    別サイトからの POST (サーバー停止など) を 403 で拒否します。
+    ブラウザは別サイトからの POST に Origin を付けるので、それが自分自身 (Host) と違えば弾きます。
+    """
+    origin = request.headers.get("origin")
+    if request.method == "POST" and origin is not None and urlsplit(origin).netloc != request.headers.get("host"):
+        return JSONResponse({"detail": "別サイトからのリクエストは受け付けないよ。"}, status_code=403)
+    return await call_next(request)
 
 
 @app.get("/")

@@ -1,6 +1,7 @@
 import asyncio
 import sys
 import unittest
+from unittest import mock
 
 from fastapi.testclient import TestClient
 
@@ -24,6 +25,29 @@ class TrustedHostTests(unittest.TestCase):
                 response = client.get("/")
 
                 self.assertEqual(response.status_code, 200)
+
+
+class CrossOriginPostTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.client = TestClient(main_101_web_ui.app, base_url="http://localhost:8080")
+        patcher = mock.patch.object(main_101_web_ui, "_server", mock.Mock(should_exit=False))
+        self.server = patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_rejects_post_from_another_origin(self) -> None:
+        response = self.client.post("/api/shutdown", headers={"Origin": "http://evil.example"})
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(self.server.should_exit)
+
+    def test_accepts_post_from_same_origin_or_without_origin(self) -> None:
+        for headers in ({"Origin": "http://localhost:8080"}, {}):
+            with self.subTest(headers=headers):
+                response = self.client.post("/api/shutdown", headers=headers)
+
+                self.assertEqual(response.status_code, 200)
+
+        self.assertTrue(self.server.should_exit)
 
 
 class RunRequestTests(unittest.TestCase):

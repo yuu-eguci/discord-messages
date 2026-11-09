@@ -54,6 +54,7 @@ cp -n .env.example .env  # -n: 既にある .env は上書きしない
 # もしポートが埋まってたら↓ (bot token を扱うので、必ず 127.0.0.1 にだけ公開してね)
 # (sleep 2 && open http://localhost:8080) & docker compose run --rm -p 127.0.0.1:8080:8000 web && open output
 # NOTE: web UI は bot token を返すので、ホストの 127.0.0.1 にだけ公開し、 Host ヘッダも localhost / 127.0.0.1 以外は拒否します。
+#       別サイト (Origin が自分自身と違う) からの POST も 403 で拒否します。
 
 # Python スクリプトを 1 本ずつ動かすならこう。成果物は output/ に出るよ。
 # bot token は --discord-bot-token の代わりに環境変数 DISCORD_BOT_TOKEN でも渡せる。
