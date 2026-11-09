@@ -33,19 +33,11 @@ discord-messages
 - pip-audit: 依存パッケージの既知脆弱性チェック (dev)
 - httpx2: web UI テストの `TestClient` 用 (dev)
 
-## dev note
+## Discord 側の準備
 
 - Discord Application の作成が必要: https://discord.com/developers/applications
 - Bot Token も必要。このとき Message Content Intent ON が必要。
 - Discord 側で developer mode ON が必要: https://qiita.com/ymzkjpx/items/8f42733d0fb67d454e27
-
-```bash
-docker compose up --detached --build
-docker compose run --rm app pipenv install --dev
-docker compose run --rm app pipenv install --dev ruff
-docker compose run --rm app pipenv install discord.py
-# モジュール入れたら build し直してねー。
-```
 
 ## How to start
 
@@ -55,29 +47,44 @@ docker compose run --rm app pipenv install discord.py
 # 今回はそれぞれのスクリプトを単発で動かすだけで、最初のビルドは pipenv と dependencies を用意するのだけが目的 (ジョブ実行型) なので build だけでいいよ
 docker compose build
 
-# Ruff を動かしてみる
-docker compose run --rm app pipenv run ruff check .
-docker compose run --rm app pipenv run ruff check --fix .
-
-# 自慢の web UI はこちら。
+# 自慢の web UI はこちら。 001 → 002 → 003 をまとめて実行して、成果物は output/ に出るよ。
+# フォームの初期値を入れておきたいなら .env を用意してね (無くても動く)。
+cp .env.example .env
 (sleep 2 && open http://localhost:8000) & docker compose run --rm --service-ports web && open output
 # もしポートが埋まってたら↓ (bot token を扱うので、必ず 127.0.0.1 にだけ公開してね)
 # (sleep 2 && open http://localhost:8080) & docker compose run --rm -p 127.0.0.1:8080:8000 web && open output
 # NOTE: web UI は bot token を返すので、ホストの 127.0.0.1 にだけ公開し、 Host ヘッダも localhost / 127.0.0.1 以外は拒否します。
 
-# Python スクリプトを動かしてみる
-# NOTE: いやー、このスクリプトは秘密情報多いからここには書けないや。 help コマンドだけここに置いとくよ。
-# NOTE: bot token は --discord-bot-token の代わりに環境変数 DISCORD_BOT_TOKEN でも渡せる。 (シェル履歴やプロセス一覧に残したくないとき用)
-#       docker compose run --rm -e DISCORD_BOT_TOKEN app pipenv run python main_001_discord_to_jsonl.py --discord-channel-id ...
+# Python スクリプトを 1 本ずつ動かすならこう。成果物は output/ に出るよ。
+# bot token は --discord-bot-token の代わりに環境変数 DISCORD_BOT_TOKEN でも渡せる。
+# read -s で入力すれば、シェル履歴にもプロセス一覧にも残らない。
+read -rs DISCORD_BOT_TOKEN && export DISCORD_BOT_TOKEN
+docker compose run --rm -e DISCORD_BOT_TOKEN app pipenv run python main_001_discord_to_jsonl.py --discord-channel-id <チャネル ID>
+docker compose run --rm app pipenv run python main_002_rawjsonl_to_parsedjsonl.py --input output/main_001_discord_to_jsonl.jsonl
+docker compose run --rm app pipenv run python main_003_parsedjsonl_to_anotherformat.py --input output/main_002_rawjsonl_to_parsedjsonl.jsonl --format anki
+
+# ほかのオプション (ユーザ絞り込み、日付、件数、出力先など) は help を見てね。
 docker compose run --rm app pipenv run python main_001_discord_to_jsonl.py --help
 docker compose run --rm app pipenv run python main_002_rawjsonl_to_parsedjsonl.py --help
 docker compose run --rm app pipenv run python main_003_parsedjsonl_to_anotherformat.py --help
 ```
 
+## 依存の追加・更新
+
+```bash
+# Pipfile / Pipfile.lock はバインドマウント経由でホスト側が更新される。
+docker compose run --rm app pipenv install <パッケージ>        # dev 依存なら --dev
+docker compose run --rm app pipenv update                      # ロックファイルの更新
+# モジュール入れたら build し直してねー。 (venv はイメージの中にあるので)
+docker compose build
+```
+
 ## コミット前確認
 
 ```bash
+# Ruff (linter)
 docker compose run --rm app pipenv run ruff check .
+docker compose run --rm app pipenv run ruff check --fix .
 
 # discover: テストを自動探索
 # -s tests: テストが入っているディレクトリ
