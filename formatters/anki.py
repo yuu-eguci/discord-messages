@@ -2,17 +2,23 @@
 
 各 `heading` を表の 1 列目に、`children` を `<br />` 区切りで 2 列目に入れます。
 3 列目は常に `discord` にします。
+`#html:true` なので `&` `<` `>` は HTML エスケープし、列がずれないようにタブは半角スペースにします。
 """
 
+from html import escape
 from typing import Any
 
 
+def _to_field(value: object) -> str:
+    return escape(str(value), quote=False).replace("\t", " ")
+
+
 def _render_entry(entry: dict[str, Any]) -> str:
-    heading = str(entry.get("heading", ""))
+    heading = _to_field(entry.get("heading", ""))
     children = entry.get("children", [])
     if not isinstance(children, list):
         children = []
-    child_text = "<br />".join(str(child) for child in children)
+    child_text = "<br />".join(_to_field(child) for child in children)
     return f"{heading}\t{child_text}\tdiscord"
 
 
