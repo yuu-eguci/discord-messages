@@ -49,7 +49,7 @@ docker compose build
 
 # 自慢の web UI はこちら。 001 → 002 → 003 をまとめて実行して、成果物は output/ に出るよ。
 # フォームの初期値を入れておきたいなら .env を用意してね (無くても動く)。
-cp .env.example .env
+cp -n .env.example .env  # -n: 既にある .env は上書きしない
 (sleep 2 && open http://localhost:8000) & docker compose run --rm --service-ports web && open output
 # もしポートが埋まってたら↓ (bot token を扱うので、必ず 127.0.0.1 にだけ公開してね)
 # (sleep 2 && open http://localhost:8080) & docker compose run --rm -p 127.0.0.1:8080:8000 web && open output
