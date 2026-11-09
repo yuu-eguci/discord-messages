@@ -2,12 +2,15 @@ import argparse
 import asyncio
 import json
 import logging
+import os
+from collections.abc import Sequence
 from datetime import UTC, date, datetime, time
 from pathlib import Path
 
 import discord
 
 logger = logging.getLogger(__name__)
+BOT_TOKEN_ENV = "DISCORD_BOT_TOKEN"
 
 
 def _default_output() -> str:
@@ -26,20 +29,12 @@ def build_parser() -> argparse.ArgumentParser:
         description="Export Discord messages to JSONL.",
     )
     parser.add_argument(
-        "--discord-application-id",
-        required=True,
-        type=int,
-        help="Discord application ID. よくわかんなかったらここ行って: https://discord.com/developers/applications",
-    )
-    parser.add_argument(
-        "--discord-public-key",
-        required=True,
-        help="Discord public key. これも Discord Application のページにある。",
-    )
-    parser.add_argument(
         "--discord-bot-token",
-        required=True,
-        help="Discord bot token. これも Discord Application のページにある。 Bot は application の下位リソース。",
+        default=None,
+        help=(
+            "Discord bot token. Discord Application のページ (https://discord.com/developers/applications) にある。"
+            f" 省略時は環境変数 {BOT_TOKEN_ENV} を使う。"
+        ),
     )
     parser.add_argument(
         "--discord-channel-id",
@@ -73,6 +68,20 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """
+    引数をパースします。 bot token は引数を優先し、無ければ環境変数から取ります。
+    (シェル履歴やプロセス一覧に token を残したくないときは環境変数で渡してね。)
+    """
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if not args.discord_bot_token:
+        args.discord_bot_token = os.environ.get(BOT_TOKEN_ENV)
+    if not args.discord_bot_token:
+        parser.error(f"--discord-bot-token か環境変数 {BOT_TOKEN_ENV} が必要だよ。")
+    return args
+
+
 def build_intents() -> discord.Intents:
     """
     メッセージ本文を取得できるように intents を組み立てます。
@@ -85,7 +94,7 @@ def build_intents() -> discord.Intents:
 
 
 async def _run() -> None:
-    args = build_parser().parse_args()
+    args = parse_args()
     after = _parse_date_from(args.date_from)
     output_path = Path("output") / args.output
     output_path.parent.mkdir(parents=True, exist_ok=True)

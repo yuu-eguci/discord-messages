@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    # NOTE: 秘密情報はコマンドライン引数で渡そうぜっていう結論になったので、 env は使わない。
+    # NOTE: 秘密情報は .env 経由では渡さない。コマンドライン引数か、 run -e DISCORD_BOT_TOKEN で明示的に渡す。
     # env_file:
     #   - .env
     environment:
