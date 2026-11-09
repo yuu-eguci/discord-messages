@@ -51,6 +51,26 @@ class AnkiFormatterTests(unittest.TestCase):
             "#separator:tab\n#html:true\nfoo\tbar\tdiscord\n",
         )
 
+    def test_escapes_html_and_replaces_tabs(self) -> None:
+        text = format_anki(
+            [
+                [
+                    {
+                        "heading": "a <b & c\td",
+                        "children": [
+                            "x > y",
+                            "e\tf",
+                        ],
+                    },
+                ],
+            ],
+        )
+
+        self.assertEqual(
+            text,
+            "#separator:tab\n#html:true\na &lt;b &amp; c d\tx &gt; y<br />e f\tdiscord\n",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
