@@ -6,7 +6,7 @@ import sys
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
 import uvicorn
 
@@ -96,7 +96,7 @@ class RunRequest(BaseModel):
     dry_run: bool = False
 
     @model_validator(mode="after")
-    def _require_discord_args_unless_dry_run(self) -> "RunRequest":
+    def _require_discord_args_unless_dry_run(self) -> Self:
         """
         mode="before" 各フィールドに型を適用する前。 dict が渡ってくる。
         mode="after" self の中に型付きの値が入ってくる。
