@@ -1,0 +1,39 @@
+name: CI
+
+# lint・テスト・依存の脆弱性チェックだけを行います。デプロイや Discord への接続はしません。
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # 新しく公開された脆弱性に気づくため、週 1 回 (月曜 00:00 UTC) 実行します。
+    - cron: "0 0 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build
+        run: docker compose build app
+
+      - name: Lint
+        run: docker compose run --rm app pipenv run ruff check .
+
+      - name: Test
+        run: docker compose run --rm app pipenv run python -m unittest discover -s tests -v
+
+      - name: Audit dependencies
+        run: docker compose run --rm app pipenv run pip-audit

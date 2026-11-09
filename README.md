@@ -30,6 +30,7 @@ discord-messages
 - discord.py: メッセージ取得 (001)
 - FastAPI / uvicorn / python-dotenv: web UI (101)
 - Ruff: linter (dev)
+- pip-audit: 依存パッケージの既知脆弱性チェック (dev)
 - httpx: web UI テストの `TestClient` 用 (dev)
 
 ## dev note
@@ -82,4 +83,9 @@ docker compose run --rm app pipenv run ruff check .
 # -s tests: テストが入っているディレクトリ
 # -v: verbose
 docker compose run --rm app pipenv run python -m unittest discover -s tests -v
+
+# 依存パッケージの既知脆弱性チェック
+docker compose run --rm app pipenv run pip-audit
 ```
+
+GitHub Actions (`.github/workflows/ci.yml`) でも push / PR / 週 1 回の定期実行で、同じ lint・テスト・pip-audit を Docker Compose で実行しています。
