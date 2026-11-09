@@ -31,7 +31,7 @@ discord-messages
 - FastAPI / uvicorn / python-dotenv: web UI (101)
 - Ruff: linter (dev)
 - pip-audit: 依存パッケージの既知脆弱性チェック (dev)
-- httpx: web UI テストの `TestClient` 用 (dev)
+- httpx2: web UI テストの `TestClient` 用 (dev)
 
 ## dev note
 

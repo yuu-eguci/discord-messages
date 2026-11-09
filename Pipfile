@@ -11,8 +11,8 @@ python-dotenv = "*"
 
 [dev-packages]
 ruff = "*"
-httpx = "*"
 pip-audit = "*"
+httpx2 = "*"
 
 [requires]
 python_version = "3.14"
