@@ -2,7 +2,8 @@
 #       なんかどのイメージも同じ感じなのでしょうがない。
 FROM python:3.14.10-slim-trixie
 
-RUN pip install --no-cache-dir pipenv
+# pipenv はバージョンを固定して、ビルドのたびに挙動が変わらないようにします。
+RUN pip install --no-cache-dir pipenv==2026.11.0
 
 WORKDIR /app
 
