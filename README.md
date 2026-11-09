@@ -22,6 +22,15 @@ discord-messages
 
 ![](./docs/readme-004.png)
 
+## 実行環境と主要依存
+
+- Docker / Docker Compose (ホストに Python は不要)
+- Python 3.14 (`Dockerfile` のベースイメージ `python:3.14.10-slim-trixie`)
+- pipenv (`Pipfile` / `Pipfile.lock`)
+- discord.py: メッセージ取得 (001)
+- FastAPI / uvicorn / python-dotenv: web UI (101)
+- Ruff: linter (dev)
+
 ## dev note
 
 - Discord Application の作成が必要: https://discord.com/developers/applications

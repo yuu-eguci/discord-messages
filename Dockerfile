@@ -1,6 +1,6 @@
 # NOTE: critical_high_vulnerabilities の警告が出ているけど……
 #       なんかどのイメージも同じ感じなのでしょうがない。
-FROM python:3.14.5-slim-trixie
+FROM python:3.14.10-slim-trixie
 
 RUN pip install --no-cache-dir pipenv
 
