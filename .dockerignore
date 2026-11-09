@@ -1,0 +1,7 @@
+# ビルドに必要なのは Pipfile / Pipfile.lock だけ。秘密情報や成果物をビルドコンテキストへ送らないようにします。
+.env
+.git
+.venv
+output
+**/__pycache__
+.ruff_cache
