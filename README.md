@@ -30,6 +30,7 @@ discord-messages
 - discord.py: メッセージ取得 (001)
 - FastAPI / uvicorn / python-dotenv: web UI (101)
 - Ruff: linter (dev)
+- httpx: web UI テストの `TestClient` 用 (dev)
 
 ## dev note
 
@@ -59,8 +60,9 @@ docker compose run --rm app pipenv run ruff check --fix .
 
 # 自慢の web UI はこちら。
 (sleep 2 && open http://localhost:8000) & docker compose run --rm --service-ports web && open output
-# もしポートが埋まってたら↓
-# (sleep 2 && open http://localhost:8000) & docker compose run --rm -p 8080:8000 --service-ports web && open output
+# もしポートが埋まってたら↓ (bot token を扱うので、必ず 127.0.0.1 にだけ公開してね)
+# (sleep 2 && open http://localhost:8080) & docker compose run --rm -p 127.0.0.1:8080:8000 web && open output
+# NOTE: web UI は bot token を返すので、ホストの 127.0.0.1 にだけ公開し、 Host ヘッダも localhost / 127.0.0.1 以外は拒否します。
 
 # Python スクリプトを動かしてみる
 # NOTE: いやー、このスクリプトは秘密情報多いからここには書けないや。 help コマンドだけここに置いとくよ。
