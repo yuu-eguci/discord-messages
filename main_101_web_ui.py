@@ -14,6 +14,7 @@ import uvicorn
 #       dotenv であれば、リアルタイムで .env を変更できる良さがあるので、今回は採用。
 from dotenv import dotenv_values
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, model_validator
 
@@ -33,6 +34,9 @@ OUTPUT_002 = "output/main_002_rawjsonl_to_parsedjsonl.jsonl"
 # NOTE: FastAPI の読み方は……
 #       @app.get とか @app.post がルーティング定義なので、そこを見ていく。
 app = FastAPI()
+# GET /api/defaults は bot token を返すので、 Host が localhost / 127.0.0.1 以外のリクエストは 400 で拒否します。
+# (悪意のあるサイトが DNS rebinding で、ブラウザ経由でこの API を読むのを防ぐため。)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1"])
 
 
 @app.get("/")
