@@ -66,6 +66,8 @@ docker compose run --rm app pipenv run ruff check --fix .
 
 # Python スクリプトを動かしてみる
 # NOTE: いやー、このスクリプトは秘密情報多いからここには書けないや。 help コマンドだけここに置いとくよ。
+# NOTE: bot token は --discord-bot-token の代わりに環境変数 DISCORD_BOT_TOKEN でも渡せる。 (シェル履歴やプロセス一覧に残したくないとき用)
+#       docker compose run --rm -e DISCORD_BOT_TOKEN app pipenv run python main_001_discord_to_jsonl.py --discord-channel-id ...
 docker compose run --rm app pipenv run python main_001_discord_to_jsonl.py --help
 docker compose run --rm app pipenv run python main_002_rawjsonl_to_parsedjsonl.py --help
 docker compose run --rm app pipenv run python main_003_parsedjsonl_to_anotherformat.py --help

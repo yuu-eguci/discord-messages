@@ -57,12 +57,6 @@
 <body>
   <h1>discord-messages web UI</h1>
   <form id="run-form">
-    <label for="discord-application-id">application id</label>
-    <input id="discord-application-id" name="discord_application_id" type="text" required>
-
-    <label for="discord-public-key">public key</label>
-    <input id="discord-public-key" name="discord_public_key" type="password" required>
-
     <label for="discord-bot-token">bot token</label>
     <input id="discord-bot-token" name="discord_bot_token" type="password" required>
 
@@ -104,12 +98,7 @@
       const response = await fetch("/api/defaults");
       const defaults = await response.json();
 
-      for (const key of [
-        "discord_application_id",
-        "discord_public_key",
-        "discord_bot_token",
-        "discord_channel_id",
-      ]) {
+      for (const key of ["discord_bot_token", "discord_channel_id"]) {
         document.getElementById(key.replaceAll("_", "-")).value = defaults[key];
       }
 

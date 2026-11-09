@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import sys
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -57,8 +58,6 @@ async def defaults() -> dict[str, object]:
     """
     env = dotenv_values(ENV_PATH)
     return {
-        "discord_application_id": env.get("WEB_DEFAULT_DISCORD_APPLICATION_ID") or "",
-        "discord_public_key": env.get("WEB_DEFAULT_DISCORD_PUBLIC_KEY") or "",
         "discord_bot_token": env.get("WEB_DEFAULT_DISCORD_BOT_TOKEN") or "",
         "discord_channel_id": env.get("WEB_DEFAULT_DISCORD_CHANNEL_ID") or "",
         "discord_user_id_choices": _parse_user_id_choices(env.get("WEB_DISCORD_USER_ID_CHOICES_CSV") or ""),
@@ -88,8 +87,6 @@ class RunRequest(BaseModel):
     各フィールドは main scripts 001〜003 のコマンドライン引数に対応します。
     """
 
-    discord_application_id: int | None = None
-    discord_public_key: str | None = None
     discord_bot_token: str | None = None
     discord_channel_id: int | None = None
     discord_user_id: int | None = None
@@ -110,12 +107,7 @@ class RunRequest(BaseModel):
         """
         if self.dry_run:
             return self
-        required = (
-            "discord_application_id",
-            "discord_public_key",
-            "discord_bot_token",
-            "discord_channel_id",
-        )
+        required = ("discord_bot_token", "discord_channel_id")
         missing = [name for name in required if getattr(self, name) in (None, "")]
         if missing:
             raise ValueError(f"dry run でないなら必須だよ: {', '.join(missing)}")
@@ -213,8 +205,16 @@ async def _run_real(request: RunRequest, queue: asyncio.Queue) -> None:
     """
     script 001 → 002 → 003 を順番に subprocess で実行します。
     """
+    env = _build_env(request)
     for step, (script, command) in enumerate(_build_commands(request), start=1):
-        await _run_script(queue, step, script, command)
+        await _run_script(queue, step, script, command, env)
+
+
+def _build_env(request: RunRequest) -> dict[str, str]:
+    """
+    サブプロセスの環境変数です。 bot token は引数ではなくここで渡します。 (プロセス一覧に出さないため。)
+    """
+    return {**os.environ, "DISCORD_BOT_TOKEN": str(request.discord_bot_token)}
 
 
 def _build_commands(request: RunRequest) -> list[tuple[str, list[str]]]:
@@ -224,12 +224,6 @@ def _build_commands(request: RunRequest) -> list[tuple[str, list[str]]]:
     command_001 = [
         sys.executable,
         SCRIPT_001,
-        "--discord-application-id",
-        str(request.discord_application_id),
-        "--discord-public-key",
-        str(request.discord_public_key),
-        "--discord-bot-token",
-        str(request.discord_bot_token),
         "--discord-channel-id",
         str(request.discord_channel_id),
     ]
@@ -246,16 +240,17 @@ def _build_commands(request: RunRequest) -> list[tuple[str, list[str]]]:
     return [(SCRIPT_001, command_001), (SCRIPT_002, command_002), (SCRIPT_003, command_003)]
 
 
-async def _run_script(queue: asyncio.Queue, step: int, script: str, command: list[str]) -> None:
+async def _run_script(queue: asyncio.Queue, step: int, script: str, command: list[str], env: dict[str, str]) -> None:
     """
     スクリプトを 1 本実行して、出力を一行ずつイベントとして queue に積みます。
-    NOTE: イベントに command は入れません。 bot token などの秘密情報が SSE に漏れてしまうので。
+    NOTE: イベントに env は入れません。 bot token などの秘密情報が SSE に漏れてしまうので。
     """
     await queue.put({"type": "step_start", "step": step, "script": script})
     process = await asyncio.create_subprocess_exec(
         *command,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
+        env=env,
     )
     assert process.stdout is not None
     while line := await process.stdout.readline():
